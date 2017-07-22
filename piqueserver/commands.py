@@ -45,7 +45,7 @@ else:
         make_color)
     from pyspades.server import parse_command
     from piqueserver.map import check_rotation, MapNotFound
-    from piqueserver import cfg
+    from piqueserver.cfg import config
 
     commands = {}
     aliases = {}
@@ -1003,8 +1003,7 @@ else:
     # optional commands
     try:
         import pygeoip
-        database = pygeoip.GeoIP(os.path.join(
-            cfg.config_dir, 'data/GeoLiteCity.dat'))
+        database = pygeoip.GeoIP(config.get_geoip_path())
 
         @name('from')
         def where_from(connection, value=None):

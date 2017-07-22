@@ -15,14 +15,14 @@ MAXMIND_DOWNLOAD = 'http://geolite.maxmind.com/download/geoip/database/GeoLiteCi
 def copy_config():
     config_source = os.path.dirname(os.path.abspath(__file__)) + '/config'
     print('Attempting to copy example config to %s (origin: %s).' %
-          (cfg.config_dir, config_source))
+          (cfg.config.config_dir, config_source))
     try:
-        shutil.copytree(config_source, cfg.config_dir)
+        shutil.copytree(config_source, cfg.config.config_dir)
     except Exception as e:  # pylint: disable=broad-except
         print(e)
         sys.exit(1)
 
-    print('Complete! Please edit the files in %s to your liking.' % cfg.config_dir)
+    print('Complete! Please edit the files in %s to your liking.' % cfg.config.config_dir)
 
 
 def update_geoip(target_dir):
@@ -63,6 +63,8 @@ def run_server():
 
 
 def main():
+    default_location = cfg.get_default_location()
+
     description = '%s is an open-source Python server implementation ' \
                   'for the voxel-based game "Ace of Spades".' % cfg.pkg_name
     arg_parser = argparse.ArgumentParser(prog=cfg.pkg_name,
@@ -76,10 +78,10 @@ def main():
                             help='add extra json parameters '
                                  '(overrides the ones present in the config file)')
 
-    arg_parser.add_argument('-d', '--config-dir', default=cfg.config_dir,
+    arg_parser.add_argument('-d', '--config-dir', default=default_location,
                             help='specify the directory which contains '
                                  'maps, scripts, etc (in correctly named '
-                                 'subdirs) - default is %s' % cfg.config_path)
+                                 'subdirs) - default is %s' % default_location)
 
     arg_parser.add_argument('--copy-config', action='store_true',
                             help='copies the default/example config dir to '
@@ -91,14 +93,18 @@ def main():
     args = arg_parser.parse_args()
 
     # populate the global config with values from args
-    cfg.config_dir = args.config_dir
+    cfg.config = cfg.ServerConfiguration(args.config_dir)
 
-    if args.config_file is None:
-        cfg.config_file = os.path.join(cfg.config_dir, 'config.json')
-    else:
-        cfg.config_file = args.config_file
+    if args.config_file is not None:
+        cfg.config.config_file = args.config_file
 
-    cfg.json_parameters = args.json_parameters
+    if args.json_parameters:
+        try:
+            cfg.config.load_cli_options(args.json_parameters)
+        except Exception as e:  # pylint: disable=broad-except
+            print('Error loading json parameters from the command line')
+            print(e)
+            sys.exit(1)
 
     run = True
 
@@ -108,11 +114,12 @@ def main():
         copy_config()
         run = False
     if args.update_geoip:
-        update_geoip(cfg.config_dir)
+        update_geoip(cfg.config.config_dir)
         run = False
 
     # only run the server if other tasks weren't performed
     if run:
+        cfg.config.load_config()
         run_server()
 
 if __name__ == "__main__":

@@ -45,6 +45,7 @@ from twisted.internet import reactor
 from twisted.python import log
 from twisted.python.logfile import DailyLogFile
 
+from piqueserver.cfg import config
 from piqueserver import cfg
 
 import pyspades.debug
@@ -587,10 +588,9 @@ class FeatureProtocol(ServerProtocol):
         self.bans = NetworkDict()
         # TODO: check if this is actually working and not silently failing
         try:
-            self.bans.read_list(
-                json.load(open(os.path.join(cfg.config_dir, 'bans.txt'), 'rb')))
+            self.bans.read_list(config.get_bans())
         except IOError:
-            pass
+            print("(failed to read banlist)")
         self.hard_bans = set()  # possible DDoS'ers are added here
         self.player_memory = deque(maxlen=100)
         self.config = config
@@ -1070,31 +1070,6 @@ def run():
     """
     runs the server
     """
-
-    try:
-        with open(cfg.config_file, 'r') as f:
-            config = json.load(f)
-            cfg.config = config
-    except IOError as e:
-        print(
-            'Error reading config from {} - {}: '.format(cfg.config_file, e))
-        print('If you haven\'t already, try copying the example config to '
-              'the default location with "piqueserver --copy-config".')
-        sys.exit(1)
-    except ValueError as e:
-        print("Error in config file {}: ".format(cfg.config_file) + str(e))
-        sys.exit(1)
-
-    # update with parameters from cfg (supplied as cli args)
-    if cfg.json_parameters:
-        try:
-            params = json.loads(cfg.json_parameters)
-        except Exception as e:  # pylint: disable=broad-except
-            print('Error loading json parameters from the command line')
-            print(e)
-            sys.exit(1)
-        config.update(params)
-
     # apply scripts
 
     protocol_class = FeatureProtocol
@@ -1116,12 +1091,11 @@ def run():
         1, os.path.dirname(os.path.abspath(__file__)) + '/../pyspades')
     sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)))
 
-    script_dir = os.path.join(cfg.config_dir, 'scripts/')
     for script in script_names[:]:
         try:
             # NOTE: this finds and loads scripts directly from the script dir
             # no need for messing with sys.path
-            f, filename, desc = imp.find_module(script, [script_dir])
+            f, filename, desc = imp.find_module(script, [config.script_dir])
             module = imp.load_module(script, f, filename, desc)
             script_objects.append(module)
         except ImportError as e:
